@@ -1,9 +1,11 @@
-const { connectDB, query, getPool } = require('./db');
+const { connectDB, query, getPool, disconnectDB } = require('./db');
+const { migrateBaseSchema } = require('./migrate_base_schema');
 const logger = require('../utils/logger');
 
 async function migrateAdminPanel() {
   logger.info('Starting Admin Panel Database Migration...');
   await connectDB();
+  await migrateBaseSchema();
 
   try {
     // 1. Expand users table
@@ -142,7 +144,7 @@ async function migrateAdminPanel() {
 
       for (const [key, val, cat, desc] of defaultSettings) {
         await query(
-          'INSERT INTO system_settings (setting_key, setting_value, category, description) VALUES (?, ?, ?, ?)',
+          'INSERT IGNORE INTO system_settings (setting_key, setting_value, category, description) VALUES (?, ?, ?, ?)',
           [key, val, cat, desc]
         );
       }
@@ -150,11 +152,22 @@ async function migrateAdminPanel() {
     }
 
     logger.info('Admin Panel Database Migration completed successfully!');
-    process.exit(0);
   } catch (err) {
     logger.error(`Migration failed: ${err.message}`);
-    process.exit(1);
+    throw err;
   }
 }
 
-migrateAdminPanel();
+if (require.main === module) {
+  migrateAdminPanel()
+    .then(async () => {
+      await disconnectDB();
+      process.exit(0);
+    })
+    .catch(async () => {
+      await disconnectDB();
+      process.exit(1);
+    });
+}
+
+module.exports = { migrateAdminPanel };

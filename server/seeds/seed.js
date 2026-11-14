@@ -1,19 +1,20 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const { connectDB, disconnectDB, getPool, transaction } = require('../src/config/db');
+const { migrateBaseSchema } = require('../src/config/migrate_base_schema');
 const logger = require('../src/utils/logger');
 
 const seedDatabase = async () => {
   try {
     logger.info('Starting MediStock MySQL database seeding...');
     await connectDB();
+    await migrateBaseSchema();
     const pool = getPool();
 
     // Check if users table already has data
     const [existingUsers] = await pool.query('SELECT COUNT(*) AS count FROM users');
     if (existingUsers[0].count > 0) {
       logger.warn('Database already contains user records. Skipping full reseed to prevent duplicate data.');
-      await disconnectDB();
       return;
     }
 
@@ -153,13 +154,22 @@ const seedDatabase = async () => {
     logger.info('  Admin:       admin@medistock.com / Admin@123');
     logger.info('  Pharmacist:  pharmacist@medistock.com / Pharmacist@123');
     logger.info('  Customer:    customer@medistock.com / Customer@123');
-
-    await disconnectDB();
   } catch (error) {
     logger.error('Database seeding failed:', error.message);
-    await disconnectDB();
-    process.exit(1);
+    throw error;
   }
 };
 
-seedDatabase();
+if (require.main === module) {
+  seedDatabase()
+    .then(async () => {
+      await disconnectDB();
+      process.exit(0);
+    })
+    .catch(async () => {
+      await disconnectDB();
+      process.exit(1);
+    });
+}
+
+module.exports = { seedDatabase };

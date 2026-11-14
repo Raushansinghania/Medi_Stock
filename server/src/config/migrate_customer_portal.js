@@ -1,10 +1,12 @@
 require('dotenv').config();
 const { connectDB, disconnectDB, getPool } = require('./db');
+const { migrateBaseSchema } = require('./migrate_base_schema');
 const logger = require('../utils/logger');
 
 const runMigration = async () => {
   try {
     await connectDB();
+    await migrateBaseSchema();
     const pool = getPool();
     logger.info('Starting Customer Portal Database Migration...');
 
@@ -235,13 +237,19 @@ const runMigration = async () => {
       );
     }
 
-    // 8. Seed sample demo order for Michael Clark (User ID 3, Customer ID 1) if none exists
-    const [existingOrders] = await pool.query('SELECT COUNT(*) AS count FROM orders WHERE user_id = 3');
-    if (existingOrders[0].count === 0) {
+    // 8. Seed sample demo order for Customer demo account if none exists
+    const [custUsers] = await pool.query("SELECT id FROM users WHERE email = 'customer@medistock.com'");
+    const targetUserId = custUsers[0]?.id || 3;
+    const [custRows] = await pool.query("SELECT id FROM customers WHERE email = 'customer@medistock.com' OR user_id = ?", [targetUserId]);
+    const targetCustomerId = custRows[0]?.id || 1;
+
+    const [existingOrders] = await pool.query("SELECT COUNT(*) AS count FROM orders WHERE order_number IN ('ORD-2026-0001', 'ORD-2026-0002')");
+    if (existingOrders[0].count === 0 && custUsers.length > 0) {
       logger.info('Seeding sample orders and notifications for customer demo account...');
       const [ordRes] = await pool.query(
         `INSERT INTO orders (order_number, customer_id, user_id, order_type, delivery_address, status, subtotal, discount, tax, total_amount, payment_method, payment_status, notes)
-         VALUES ('ORD-2026-0001', 1, 3, 'delivery', '12 Elm Street, Springfield', 'delivered', 33.50, 2.00, 1.50, 33.00, 'cash', 'successful', 'Standard home delivery')`
+         VALUES ('ORD-2026-0001', ?, ?, 'delivery', '12 Elm Street, Springfield', 'delivered', 33.50, 2.00, 1.50, 33.00, 'cash', 'successful', 'Standard home delivery')`,
+        [targetCustomerId, targetUserId]
       );
       const ordId = ordRes.insertId;
 
@@ -254,7 +262,8 @@ const runMigration = async () => {
       // Seed an active processing order
       const [ordRes2] = await pool.query(
         `INSERT INTO orders (order_number, customer_id, user_id, order_type, delivery_address, status, subtotal, discount, tax, total_amount, payment_method, payment_status, notes)
-         VALUES ('ORD-2026-0002', 1, 3, 'pickup', 'Main Pharmacy Counter Pickup', 'processing', 19.50, 2.00, 1.00, 18.50, 'cash', 'pending', 'Order verified by Pharmacist Sarah')`
+         VALUES ('ORD-2026-0002', ?, ?, 'pickup', 'Main Pharmacy Counter Pickup', 'processing', 19.50, 2.00, 1.00, 18.50, 'cash', 'pending', 'Order verified by Pharmacist Sarah')`,
+        [targetCustomerId, targetUserId]
       );
       const ordId2 = ordRes2.insertId;
 
@@ -267,18 +276,30 @@ const runMigration = async () => {
       // Seed notifications for customer
       await pool.query(
         `INSERT INTO notifications (user_id, title, message, type, is_read, link) VALUES
-         (3, 'Order Delivered Successfully', 'Your order ORD-2026-0001 has been delivered to 12 Elm Street.', 'order', 1, '/customer/orders'),
-         (3, 'Prescription Approved', 'Your prescription for Amoxicillin 500mg has been verified and approved by Pharmacist Sarah.', 'prescription', 0, '/customer/prescriptions'),
-         (3, 'Order In Processing', 'Your pickup order ORD-2026-0002 is currently being packed and will be ready for collection shortly.', 'order', 0, '/customer/orders')`
+         (?, 'Order Delivered Successfully', 'Your order ORD-2026-0001 has been delivered to 12 Elm Street.', 'order', 1, '/customer/orders'),
+         (?, 'Prescription Approved', 'Your prescription for Amoxicillin 500mg has been verified and approved by Pharmacist Sarah.', 'prescription', 0, '/customer/prescriptions'),
+         (?, 'Order In Processing', 'Your pickup order ORD-2026-0002 is currently being packed and will be ready for collection shortly.', 'order', 0, '/customer/orders')`,
+        [targetUserId, targetUserId, targetUserId]
       );
     }
 
     logger.success('Customer Portal Migration completed successfully!');
-    await disconnectDB();
   } catch (error) {
     logger.error('Migration failed:', error);
-    process.exit(1);
+    throw error;
   }
 };
 
-runMigration();
+if (require.main === module) {
+  runMigration()
+    .then(async () => {
+      await disconnectDB();
+      process.exit(0);
+    })
+    .catch(async () => {
+      await disconnectDB();
+      process.exit(1);
+    });
+}
+
+module.exports = { migrateCustomerPortal: runMigration };

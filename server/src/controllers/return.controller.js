@@ -126,16 +126,21 @@ const processReturn = async (req, res, next) => {
           ? Number(refund_amount)
           : Math.round(numQty * Number(saleItems[0].unit_price) * 100) / 100;
 
+      const reasonText = return_reason ? return_reason.trim() : 'Customer return';
+      const today = new Date().toISOString().slice(0, 10);
+
       // 3. Insert return record
       const [retRes] = await conn.execute(
-        `INSERT INTO returns (sale_id, medicine_id, customer_id, quantity, return_reason, refund_amount)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO returns (sale_id, medicine_id, customer_id, return_date, quantity, return_reason, reason, refund_amount)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           sale_id,
           medicine_id,
           sale.customer_id || null,
+          today,
           numQty,
-          return_reason ? return_reason.trim() : 'Customer return',
+          reasonText,
+          reasonText,
           refAmount,
         ]
       );

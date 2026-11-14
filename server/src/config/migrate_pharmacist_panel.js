@@ -1,8 +1,11 @@
-const { query, transaction } = require('./db');
+const { connectDB, query, transaction } = require('./db');
+const { migrateBaseSchema } = require('./migrate_base_schema');
 const logger = require('../utils/logger');
 
 async function migratePharmacistPanel() {
   logger.info('Starting Pharmacist Panel database migrations...');
+  await connectDB();
+  await migrateBaseSchema();
 
   try {
     // 1. Create medicine_batches table for FEFO inventory management
@@ -147,13 +150,20 @@ async function migratePharmacistPanel() {
     // 6. Ensure sample pending and approved prescriptions exist
     const [rxCount] = await query('SELECT COUNT(*) AS cnt FROM prescriptions WHERE status = "pending"');
     if (rxCount[0].cnt === 0) {
-      await query(`
-        INSERT INTO prescriptions (customer_id, user_id, doctor_name, prescription_date, notes, status, original_filename, file_type, file_size)
-        VALUES 
-        (1, 3, 'Dr. Robert Shaw, MD (Cardiology)', CURDATE(), 'Rx: Paracetamol 500mg (1 TDS), Atorvastatin 10mg (1 HS)', 'pending', 'cardio_rx_sample.pdf', 'application/pdf', 145000),
-        (1, 3, 'Dr. Sarah Connor, MD (Internal Med)', DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'Rx: Amoxicillin 500mg (1 BD x 5 days)', 'under_review', 'antibiotic_rx.jpg', 'image/jpeg', 280000)
-      `);
-      logger.success('Sample pending prescriptions seeded for verification queue.');
+      const [custUsers] = await query("SELECT id FROM users WHERE email = 'customer@medistock.com'");
+      const targetUserId = custUsers[0]?.id || 3;
+      const [custRows] = await query("SELECT id FROM customers WHERE email = 'customer@medistock.com' OR user_id = ?", [targetUserId]);
+      const targetCustomerId = custRows[0]?.id || 1;
+
+      if (custUsers.length > 0) {
+        await query(`
+          INSERT INTO prescriptions (customer_id, user_id, doctor_name, prescription_date, notes, status, original_filename, file_type, file_size)
+          VALUES 
+          (?, ?, 'Dr. Robert Shaw, MD (Cardiology)', CURDATE(), 'Rx: Paracetamol 500mg (1 TDS), Atorvastatin 10mg (1 HS)', 'pending', 'cardio_rx_sample.pdf', 'application/pdf', 145000),
+          (?, ?, 'Dr. Sarah Connor, MD (Internal Med)', DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'Rx: Amoxicillin 500mg (1 BD x 5 days)', 'under_review', 'antibiotic_rx.jpg', 'image/jpeg', 280000)
+        `, [targetCustomerId, targetUserId, targetCustomerId, targetUserId]);
+        logger.success('Sample pending prescriptions seeded for verification queue.');
+      }
     }
 
     logger.success('Pharmacist Panel database migration completed successfully!');

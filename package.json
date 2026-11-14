@@ -11,7 +11,8 @@
     "test": "npm run test:server",
     "test:server": "npm --prefix server test",
     "build:client": "npm --prefix client run build",
-    "seed": "npm --prefix server run seed"
+    "seed": "npm --prefix server run seed",
+    "migrate": "npm --prefix server run migrate"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

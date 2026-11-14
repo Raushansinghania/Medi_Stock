@@ -10,13 +10,36 @@ let isConnected = false;
 /**
  * Mask credentials in database host/user info for safe logging
  */
-const getSafeDbDetails = () => {
+const getDbConfig = () => {
+  if (process.env.MYSQL_URL || process.env.DATABASE_URL) {
+    try {
+      const dbUrl = new URL(process.env.MYSQL_URL || process.env.DATABASE_URL);
+      return {
+        host: dbUrl.hostname || '127.0.0.1',
+        port: Number(dbUrl.port) || 3306,
+        user: decodeURIComponent(dbUrl.username || 'medistock_app'),
+        password: decodeURIComponent(dbUrl.password || ''),
+        database: dbUrl.pathname ? dbUrl.pathname.replace(/^\//, '') : 'medistock',
+      };
+    } catch {
+      // Fallback if URL parsing fails
+    }
+  }
+
   return {
-    host: process.env.DB_HOST || '127.0.0.1',
-    port: Number(process.env.DB_PORT) || 3306,
-    user: process.env.DB_USER || 'medistock_app',
-    database: process.env.DB_NAME || 'medistock',
+    host: process.env.DB_HOST || process.env.MYSQLHOST || '127.0.0.1',
+    port: Number(process.env.DB_PORT || process.env.MYSQLPORT) || 3306,
+    user: process.env.DB_USER || process.env.MYSQLUSER || 'medistock_app',
+    password: process.env.DB_PASSWORD !== undefined
+      ? process.env.DB_PASSWORD
+      : (process.env.MYSQLPASSWORD !== undefined ? process.env.MYSQLPASSWORD : ''),
+    database: process.env.DB_NAME || process.env.MYSQLDATABASE || 'medistock',
   };
+};
+
+const getSafeDbDetails = () => {
+  const { host, port, user, database } = getDbConfig();
+  return { host, port, user, database };
 };
 
 /**
@@ -24,17 +47,20 @@ const getSafeDbDetails = () => {
  * Never silently falls back to an in-memory database
  */
 const connectDB = async () => {
-  const { host, port, user, database } = getSafeDbDetails();
-  const password = process.env.DB_PASSWORD;
+  const { host, port, user, password, database } = getDbConfig();
 
-  if (!password && password !== '') {
-    const errorMsg = 'DB_PASSWORD is missing in server/.env. MySQL connection requires valid credentials.';
+  if (password === undefined || password === null) {
+    const errorMsg = 'Database password is missing. MySQL connection requires valid credentials.';
     logger.error(errorMsg);
     throw new Error(errorMsg);
   }
 
   try {
     logger.info(`Connecting to MySQL database at ${host}:${port} as '${user}'...`);
+
+    const sslConfig = process.env.DB_SSL === 'true'
+      ? { rejectUnauthorized: false }
+      : undefined;
 
     pool = mysql.createPool({
       host,
@@ -49,6 +75,7 @@ const connectDB = async () => {
       keepAliveInitialDelay: 10000,
       namedPlaceholders: true,
       decimalNumbers: true,
+      ...(sslConfig ? { ssl: sslConfig } : {}),
     });
 
     // Test the pool by acquiring and releasing a connection

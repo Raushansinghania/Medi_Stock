@@ -26,6 +26,12 @@ yarn-error.log*
 coverage/
 
 # Private uploads and backups
+uploads/
 server/uploads/
+server/src/config/_backup/
 *.sql
 *.sql.gz
+
+# Deployment and Cloud CLI caches
+.vercel/
+.railway/

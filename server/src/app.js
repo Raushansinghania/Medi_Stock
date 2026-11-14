@@ -32,12 +32,22 @@ const adminRoutes = require('./routes/admin.routes');
 const app = express();
 app.set('trust proxy', 1);
 
-// Security HTTP headers
-app.use(helmet());
+// Security HTTP headers with cross-origin asset policy for Vercel <-> Railway
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 
-// CORS configuration
+// CORS configuration supporting single or comma-separated origins and Vercel domains
+const clientUrls = (process.env.CLIENT_URL || '')
+  .split(',')
+  .map((url) => url.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
 const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:5173',
+  ...clientUrls,
+  'http://localhost:5173',
   'http://localhost:3000',
   'http://127.0.0.1:5173',
 ];
@@ -45,10 +55,24 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests with no origin (mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+
+      const cleanOrigin = origin.replace(/\/$/, '');
+      if (allowedOrigins.includes(cleanOrigin) || allowedOrigins.includes('*')) {
         return callback(null, true);
       }
-      return callback(null, true);
+
+      // Allow Vercel preview and production deployments
+      if (/^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(cleanOrigin)) {
+        return callback(null, true);
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

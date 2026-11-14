@@ -1,6 +1,7 @@
 require('dotenv').config();
 const app = require('./src/app');
 const { connectDB, disconnectDB } = require('./src/config/db');
+const { migrateBaseSchema } = require('./src/config/migrate_base_schema');
 const logger = require('./src/utils/logger');
 
 const PORT = process.env.PORT || 5000;
@@ -15,6 +16,7 @@ process.on('uncaughtException', (err) => {
 const startServer = async () => {
   try {
     await connectDB();
+    await migrateBaseSchema();
 
     const server = app.listen(PORT, () => {
       logger.success(`🚀 MediStock Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
