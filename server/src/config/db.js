@@ -11,9 +11,14 @@ let isConnected = false;
  * Mask credentials in database host/user info for safe logging
  */
 const getDbConfig = () => {
-  if (process.env.MYSQL_URL || process.env.DATABASE_URL) {
+  const connectionUrl = process.env.MYSQL_PRIVATE_URL ||
+    process.env.MYSQL_URL ||
+    process.env.DATABASE_PRIVATE_URL ||
+    process.env.DATABASE_URL;
+
+  if (connectionUrl) {
     try {
-      const dbUrl = new URL(process.env.MYSQL_URL || process.env.DATABASE_URL);
+      const dbUrl = new URL(connectionUrl);
       return {
         host: dbUrl.hostname || '127.0.0.1',
         port: Number(dbUrl.port) || 3306,
@@ -159,6 +164,8 @@ const disconnectDB = async () => {
 
 /**
  * Health check telemetry status helper
+ * Inspects both connection state and database schema readiness
+ * Prevents reporting healthy if required tables are missing
  */
 const getDBStatus = async () => {
   const { host, port, user, database } = getSafeDbDetails();
@@ -175,10 +182,35 @@ const getDBStatus = async () => {
   try {
     const connection = await pool.getConnection();
     const [rows] = await connection.query('SELECT VERSION() AS version');
+    
+    // Inspect database tables to prevent reporting healthy when tables are unmigrated
+    const [tables] = await connection.query(
+      'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()'
+    );
     connection.release();
+
+    const existingTables = (tables || []).map((t) => (t.TABLE_NAME || t.table_name || '').toLowerCase());
+    const requiredTables = ['users', 'categories', 'suppliers', 'medicines', 'sales', 'prescriptions', 'orders'];
+    const missingTables = requiredTables.filter((tbl) => !existingTables.includes(tbl));
+
+    if (missingTables.length > 0) {
+      return {
+        status: 'unmigrated',
+        message: `Database connected but required tables are missing: ${missingTables.join(', ')}. Migrations must be executed.`,
+        missingTables,
+        tableCount: existingTables.length,
+        engine: `MySQL ${rows?.[0]?.version || '8.0'}`,
+        host,
+        port,
+        user,
+        database,
+      };
+    }
+
     return {
       status: 'connected',
       engine: `MySQL ${rows?.[0]?.version || '8.0'}`,
+      tableCount: existingTables.length,
       host,
       port,
       user,

@@ -4,6 +4,7 @@
   "description": "MediStock - Enterprise Pharmacy Management System",
   "private": true,
   "scripts": {
+    "start": "npm --prefix server start",
     "server": "npm --prefix server run dev",
     "client": "npm --prefix client run dev",
     "dev": "concurrently -n \"SERVER,CLIENT\" -c \"blue,green\" \"npm run server\" \"npm run client\"",

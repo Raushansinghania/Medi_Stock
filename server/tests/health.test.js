@@ -29,6 +29,8 @@ describe('System Health & Base Architecture', () => {
     expect(res.body.data).toHaveProperty('database');
     expect(res.body.data.database).toHaveProperty('status', 'connected');
     expect(res.body.data.database).toHaveProperty('database', 'medistock');
+    expect(res.body.data).toHaveProperty('tableCount');
+    expect(res.body.data.tableCount).toBeGreaterThanOrEqual(20);
     expect(res.body.data).toHaveProperty('memoryUsage');
   });
 

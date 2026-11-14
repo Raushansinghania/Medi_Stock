@@ -1,10 +1,11 @@
 require('dotenv').config();
 const app = require('./src/app');
 const { connectDB, disconnectDB } = require('./src/config/db');
-const { migrateBaseSchema } = require('./src/config/migrate_base_schema');
+const { runAllMigrations } = require('./src/config/migrate');
 const logger = require('./src/utils/logger');
 
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
+const HOST = '0.0.0.0';
 
 // Catch unhandled exceptions
 process.on('uncaughtException', (err) => {
@@ -16,11 +17,11 @@ process.on('uncaughtException', (err) => {
 const startServer = async () => {
   try {
     await connectDB();
-    await migrateBaseSchema();
+    await runAllMigrations();
 
-    const server = app.listen(PORT, () => {
-      logger.success(`🚀 MediStock Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-      logger.info(`Health check available at http://localhost:${PORT}/api/v1/health`);
+    const server = app.listen(PORT, HOST, () => {
+      logger.success(`🚀 MediStock Server running in ${process.env.NODE_ENV || 'development'} mode on ${HOST}:${PORT}`);
+      logger.info(`Health check available at http://${HOST}:${PORT}/api/v1/health`);
     });
 
     // Handle unhandled promise rejections

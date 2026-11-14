@@ -13,10 +13,12 @@ router.get('/', async (req, res, next) => {
   try {
     const dbStatus = await getDBStatus();
 
+    const isHealthy = dbStatus.status === 'connected';
     const healthData = {
       service: 'MediStock API Server',
       version: '1.0.0',
-      status: dbStatus.status === 'connected' ? 'healthy' : 'degraded',
+      status: isHealthy ? 'healthy' : 'degraded',
+      tableCount: dbStatus.tableCount || 0,
       database: dbStatus,
       uptime: `${Math.floor(process.uptime())}s`,
       timestamp: new Date().toISOString(),
@@ -27,8 +29,9 @@ router.get('/', async (req, res, next) => {
       },
     };
 
-    const statusCode = dbStatus.status === 'connected' ? 200 : 503;
-    return ApiResponse.success(res, healthData, 'System operational', statusCode);
+    const statusCode = isHealthy ? 200 : 503;
+    const statusMessage = isHealthy ? 'System operational' : 'Database unmigrated or unavailable';
+    return ApiResponse.success(res, healthData, statusMessage, statusCode);
   } catch (error) {
     next(error);
   }
