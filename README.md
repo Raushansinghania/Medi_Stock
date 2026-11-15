@@ -6,7 +6,49 @@ It delivers strict role-based separation across three dedicated portals communic
 1. 🏛️ **Executive Admin Portal** (`/`)
 2. 💊 **Clinical Pharmacist Workspace** (`/pharmacist`)
 3. 🛍️ **Customer Pharmacy Portal** (`/customer`)
+Overview
+MediStock is a full-stack Pharmacy Enterprise Resource Planning (ERP) and Point of Sale (POS) application built to bring essential pharmacy operations into one centralized system.
 
+It provides three role-based portals backed by a shared MySQL database:
+1. Administrator Portal – manages pharmacy operations, users, inventory, suppliers, purchases, finances, and reports.
+2. Pharmacist Workspace – supports prescription review, medicine dispensing, expiry monitoring, returns, and POS billing.
+3. Customer Portal – allows customers to browse medicines, upload prescriptions, place orders, and view order information.
+The project is deployed online, with the frontend hosted on Vercel and the backend and MySQL database hosted on Railway.
+Live Demo
+Resource	Link
+MediStock website	https://medi-stock-five.vercel.app/
+Login page	https://medi-stock-five.vercel.app/login
+Backend health endpoint	https://medistock-production-cb9c7137.up.railway.app/api/v1/health
+GitHub repository	https://github.com/Raushansinghania/Medi_Stock
+
+
+Demo access: The login page provides demo login options for the available roles. Use those options to explore the application. Do not publish production passwords, database credentials, API secrets, or private customer information in this repository.
+
+Technology Stack
+Layer	Technologies
+Frontend	React 18, Vite, JavaScript, HTML, CSS
+Backend	Node.js, Express.js
+Database	MySQL 8.0, InnoDB
+API	REST APIs
+Authentication	JWT, bcryptjs
+Validation and security	Zod, Helmet, Express Rate Limit, parameterized SQL queries
+Testing	Jest, Supertest
+Frontend deployment	Vercel
+Backend and database hosting	Railway
+
+
+Key Features
+- Three role-based portals for administrators, pharmacists, and customers.
+- Role-based access control (RBAC) for protected application areas and API routes.
+- Medicine catalogue and category management.
+- Batch-level inventory tracking and expiry monitoring.
+- FEFO (First Expiry, First Out) stock allocation.
+- Supplier and purchase order management.
+- POS billing, sales records, payment handling, and printable invoices.
+- Digital prescription upload, review, approval, rejection, and dispensing workflow.
+- Customer registration, medicine browsing, cart, checkout, and order tracking.
+- Returns and refund inspection workflow.
+- Financial summaries, reports, notifications, and audit logs.
 ---
 
 ## 🌟 Key Architecture & Highlights
